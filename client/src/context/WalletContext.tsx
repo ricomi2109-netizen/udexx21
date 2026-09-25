@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import { wallets, type WalletProvider } from '@/data/wallets';
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
+import { useAppKit, useAppKitAccount, useAppKitState, useWalletInfo } from '@reown/appkit/react';
+import { useDisconnect } from 'wagmi';
+import type { WalletProvider } from '@/data/wallets';
 
 interface WalletState {
   connected: boolean;
@@ -11,54 +13,54 @@ interface WalletState {
 interface WalletContextValue extends WalletState {
   openModal: () => void;
   closeModal: () => void;
-  connect: (wallet: WalletProvider) => void;
+  connect: () => void;
   disconnect: () => void;
   modalOpen: boolean;
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
 
-function generateAddress(): string {
-  const chars = '0123456789abcdef';
-  let addr = '0x';
-  for (let i = 0; i < 40; i++) {
-    addr += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return addr;
-}
-
 export function WalletProviderContext({ children }: { children: ReactNode }) {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const [address, setAddress] = useState<string | null>(null);
-  const [provider, setProvider] = useState<WalletProvider | null>(null);
+  const { open, close } = useAppKit();
+  const { address, isConnected, status } = useAppKitAccount({ namespace: 'eip155' });
+  const { walletInfo } = useWalletInfo('eip155');
+  const { open: modalOpen } = useAppKitState();
+  const { disconnectAsync } = useDisconnect();
 
-  const openModal = useCallback(() => setModalOpen(true), []);
-  const closeModal = useCallback(() => setModalOpen(false), []);
+  const provider = useMemo<WalletProvider | null>(() => {
+    if (!isConnected) return null;
+    return {
+      id: walletInfo?.name?.toLowerCase().replace(/\s+/g, '-') || 'walletconnect',
+      name: walletInfo?.name || 'Connected wallet',
+      description: 'Connected through Reown AppKit',
+      icon: '🔗',
+      gradient: 'from-primary-400 to-secondary-500',
+      category: 'multichain',
+      mobile: true,
+    };
+  }, [isConnected, walletInfo?.name]);
 
-  const connect = useCallback((wallet: WalletProvider) => {
-    setConnecting(true);
-    setProvider(wallet);
-    setTimeout(() => {
-      const addr = generateAddress();
-      setAddress(addr);
-      setConnected(true);
-      setConnecting(false);
-      setTimeout(() => setModalOpen(false), 400);
-    }, 1800);
-  }, []);
+  const connect = useCallback(() => {
+    void open({ view: 'Connect', namespace: 'eip155' });
+  }, [open]);
 
   const disconnect = useCallback(() => {
-    setConnected(false);
-    setProvider(null);
-    setAddress(null);
-    setModalOpen(true);
-  }, []);
+    void disconnectAsync();
+  }, [disconnectAsync]);
 
   return (
     <WalletContext.Provider
-      value={{ connected, connecting, address, provider, openModal, closeModal, connect, disconnect, modalOpen }}
+      value={{
+        connected: isConnected,
+        connecting: status === 'connecting',
+        address: address ?? null,
+        provider,
+        openModal: connect,
+        closeModal: close,
+        connect,
+        disconnect,
+        modalOpen,
+      }}
     >
       {children}
     </WalletContext.Provider>
@@ -70,5 +72,3 @@ export function useWallet() {
   if (!ctx) throw new Error('useWallet must be used within WalletProviderContext');
   return ctx;
 }
-
-export { wallets };
