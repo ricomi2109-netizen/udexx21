@@ -11,12 +11,14 @@ import { FAQ } from '@/components/FAQ';
 import { Footer } from '@/components/Footer';
 import { Leaderboard } from '@/components/Leaderboard';
 import { ReferralSection } from '@/components/ReferralSection';
+import { WalletConnectFallback } from '@/components/WalletConnectFallback';
 
 function App() {
   return (
     <WalletProviderContext>
       <div className="min-h-screen bg-neutral-950 text-white overflow-x-hidden">
         <Toaster position="bottom-right" richColors theme="dark" />
+        <WalletConnectFallback />
         <Header />
         <main>
           <Hero />
