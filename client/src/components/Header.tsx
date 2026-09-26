@@ -29,6 +29,7 @@ export function Header() {
             {/* Desktop Nav */}
             <nav className="hidden md:flex items-center gap-8">
               <button onClick={() => scrollTo('tasks')} className="text-sm font-medium text-neutral-300 hover:text-white transition-colors">Tasks</button>
+              <button onClick={() => scrollTo('progress')} className="text-sm font-medium text-neutral-300 hover:text-white transition-colors">Progress</button>
               <button onClick={() => scrollTo('leaderboard')} className="text-sm font-medium text-neutral-300 hover:text-white transition-colors">Leaderboard</button>
               <button onClick={() => scrollTo('blockchains')} className="text-sm font-medium text-neutral-300 hover:text-white transition-colors">Chains</button>
               <button onClick={() => scrollTo('how-it-works')} className="text-sm font-medium text-neutral-300 hover:text-white transition-colors">How It Works</button>
@@ -79,6 +80,7 @@ export function Header() {
         {menuOpen && (
           <nav className="md:hidden border-t border-white/5 px-4 py-4 space-y-3 animate-slide-up">
             <button onClick={() => scrollTo('tasks')} className="block w-full text-left py-2 text-neutral-300 hover:text-white">Tasks</button>
+            <button onClick={() => scrollTo('progress')} className="block w-full text-left py-2 text-neutral-300 hover:text-white">Progress</button>
             <button onClick={() => scrollTo('leaderboard')} className="block w-full text-left py-2 text-neutral-300 hover:text-white">Leaderboard</button>
             <button onClick={() => scrollTo('blockchains')} className="block w-full text-left py-2 text-neutral-300 hover:text-white">Chains</button>
             <button onClick={() => scrollTo('how-it-works')} className="block w-full text-left py-2 text-neutral-300 hover:text-white">How It Works</button>

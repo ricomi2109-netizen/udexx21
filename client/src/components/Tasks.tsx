@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { airdropTasks, type AirdropTask } from '@/data/tasks';
 import { useWallet } from '@/context/WalletContext';
+import { useTaskProgress } from '@/context/TaskProgressContext';
 import { toast } from 'sonner';
 
 const iconMap: Record<string, LucideIcon> = {
@@ -143,23 +144,9 @@ function TaskCard({ task, completed, onComplete }: { task: AirdropTask; complete
 }
 
 export function Tasks() {
-  const { connected, address, openModal } = useWallet();
+  const { connected, openModal } = useWallet();
+  const { completedTaskIds, completedCount, totalReward, completeTask, resetProgress: resetTaskProgress } = useTaskProgress();
   const [filter, setFilter] = useState<FilterType>('All');
-  const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
-  const storageKey = address ? `aurora:completed-tasks:${address.toLowerCase()}` : null;
-
-  useEffect(() => {
-    if (!storageKey) {
-      setCompletedTaskIds(new Set());
-      return;
-    }
-    try {
-      const saved = JSON.parse(window.localStorage.getItem(storageKey) ?? '[]');
-      setCompletedTaskIds(new Set(Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string') : []));
-    } catch {
-      setCompletedTaskIds(new Set());
-    }
-  }, [storageKey]);
 
   const filtered = useMemo(
     () => (filter === 'All' ? airdropTasks : airdropTasks.filter((t) => t.type === filter)),
@@ -167,25 +154,12 @@ export function Tasks() {
   );
 
   const handleComplete = (id: string) => {
-    if (!storageKey) return;
-    setCompletedTaskIds((current) => {
-      if (current.has(id)) return current;
-      const next = new Set(current);
-      next.add(id);
-      window.localStorage.setItem(storageKey, JSON.stringify(Array.from(next)));
-      return next;
-    });
+    completeTask(id);
   };
-  const completedCount = completedTaskIds.size;
-  const totalReward = useMemo(
-    () => airdropTasks.reduce((sum, task) => completedTaskIds.has(task.id) ? sum + parseInt(task.reward.replace(/[^0-9]/g, ''), 10) : sum, 0),
-    [completedTaskIds],
-  );
 
   const resetProgress = () => {
-    if (!storageKey || completedCount === 0) return;
-    setCompletedTaskIds(new Set());
-    window.localStorage.removeItem(storageKey);
+    if (completedCount === 0) return;
+    resetTaskProgress();
     toast.success('Task progress reset');
   };
 
