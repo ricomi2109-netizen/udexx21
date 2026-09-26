@@ -1,4 +1,5 @@
 import { WalletProviderContext } from '@/context/WalletContext';
+import { Toaster } from 'sonner';
 import { Header } from '@/components/Header';
 import { Hero } from '@/components/Hero';
 import { Stats } from '@/components/Stats';
@@ -15,6 +16,7 @@ function App() {
   return (
     <WalletProviderContext>
       <div className="min-h-screen bg-neutral-950 text-white overflow-x-hidden">
+        <Toaster position="bottom-right" richColors theme="dark" />
         <Header />
         <main>
           <Hero />

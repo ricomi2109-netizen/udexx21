@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useAppKit, useAppKitAccount, useAppKitState, useWalletInfo } from '@reown/appkit/react';
-import { useDisconnect } from 'wagmi';
+import { useConnect, useDisconnect } from 'wagmi';
+import { toast } from 'sonner';
 import type { WalletProvider } from '@/data/wallets';
 
 interface WalletState {
@@ -25,7 +26,9 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
   const { address, isConnected, status } = useAppKitAccount({ namespace: 'eip155' });
   const { walletInfo } = useWalletInfo('eip155');
   const { open: modalOpen } = useAppKitState();
+  const { connectAsync, connectors } = useConnect();
   const { disconnectAsync } = useDisconnect();
+  const [attempting, setAttempting] = useState(false);
 
   const provider = useMemo<WalletProvider | null>(() => {
     if (!isConnected) return null;
@@ -40,9 +43,40 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
     };
   }, [isConnected, walletInfo?.name]);
 
-  const connect = useCallback(() => {
-    void open({ view: 'Connect', namespace: 'eip155' });
-  }, [open]);
+  const connect = useCallback(async () => {
+    setAttempting(true);
+
+    try {
+      // On desktop, ask an installed browser extension directly first. This avoids
+      // forcing MetaMask/Coinbase/Brave users through the QR/deep-link chooser.
+      const injectedWallet = connectors.find((connector) => {
+        const hasInjectedProvider = Boolean((window as Window & { ethereum?: unknown }).ethereum);
+        return hasInjectedProvider && connector.type === 'injected';
+      });
+
+      if (injectedWallet) {
+        try {
+          await connectAsync({ connector: injectedWallet });
+          toast.success(`Connected to ${injectedWallet.name}`);
+          return;
+        } catch (injectedError) {
+          const rejected = injectedError instanceof Error && /reject|denied|cancel/i.test(injectedError.message);
+          if (!rejected) {
+            toast.error('The installed wallet did not respond. Opening the wallet chooser instead.');
+          }
+        }
+      }
+
+      // AppKit handles mobile wallet redirects, WalletConnect QR scanning, and
+      // install links when no compatible extension/app is available.
+      await open({ view: 'Connect', namespace: 'eip155' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown wallet connection error';
+      toast.error(`Unable to open a wallet connection: ${message}`);
+    } finally {
+      setAttempting(false);
+    }
+  }, [connectAsync, connectors, open]);
 
   const disconnect = useCallback(() => {
     void disconnectAsync();
@@ -52,7 +86,7 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
     <WalletContext.Provider
       value={{
         connected: isConnected,
-        connecting: status === 'connecting',
+        connecting: attempting || status === 'connecting',
         address: address ?? null,
         provider,
         openModal: connect,
