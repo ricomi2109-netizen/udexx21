@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Twitter, MessageCircle, MessageSquare, Heart, GraduationCap, ArrowLeftRight,
   Droplets, Lock, UserPlus, BadgeCheck, Star, Network, Trophy, Image,
@@ -45,12 +45,16 @@ const difficultyColors: Record<AirdropTask['difficulty'], string> = {
 type FilterType = 'All' | AirdropTask['type'];
 const taskFilters: FilterType[] = ['All', 'social', 'onchain', 'community', 'quiz', 'staking', 'liquidity', 'referral'];
 
-function TaskCard({ task, onComplete }: { task: AirdropTask; onComplete: (id: string) => void }) {
-  const [status, setStatus] = useState<'idle' | 'pending' | 'done'>('idle');
+function TaskCard({ task, completed, onComplete }: { task: AirdropTask; completed: boolean; onComplete: (id: string) => void }) {
+  const [status, setStatus] = useState<'idle' | 'pending' | 'done'>(completed ? 'done' : 'idle');
   const Icon = iconMap[task.icon] || Gift;
 
+  useEffect(() => {
+    setStatus(completed ? 'done' : 'idle');
+  }, [completed]);
+
   const handleClick = () => {
-    if (status !== 'idle') return;
+    if (status !== 'idle' || completed) return;
     setStatus('pending');
     setTimeout(() => {
       setStatus('done');
@@ -125,10 +129,23 @@ function TaskCard({ task, onComplete }: { task: AirdropTask; onComplete: (id: st
 }
 
 export function Tasks() {
-  const { connected, openModal } = useWallet();
+  const { connected, address, openModal } = useWallet();
   const [filter, setFilter] = useState<FilterType>('All');
-  const [completedCount, setCompletedCount] = useState(0);
-  const [totalReward, setTotalReward] = useState(0);
+  const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
+  const storageKey = address ? `aurora:completed-tasks:${address.toLowerCase()}` : null;
+
+  useEffect(() => {
+    if (!storageKey) {
+      setCompletedTaskIds(new Set());
+      return;
+    }
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(storageKey) ?? '[]');
+      setCompletedTaskIds(new Set(Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string') : []));
+    } catch {
+      setCompletedTaskIds(new Set());
+    }
+  }, [storageKey]);
 
   const filtered = useMemo(
     () => (filter === 'All' ? airdropTasks : airdropTasks.filter((t) => t.type === filter)),
@@ -136,12 +153,20 @@ export function Tasks() {
   );
 
   const handleComplete = (id: string) => {
-    const task = airdropTasks.find((t) => t.id === id);
-    if (task) {
-      setCompletedCount((c) => c + 1);
-      setTotalReward((r) => r + parseInt(task.reward.replace(/[^0-9]/g, '')));
-    }
+    if (!storageKey) return;
+    setCompletedTaskIds((current) => {
+      if (current.has(id)) return current;
+      const next = new Set(current);
+      next.add(id);
+      window.localStorage.setItem(storageKey, JSON.stringify(Array.from(next)));
+      return next;
+    });
   };
+  const completedCount = completedTaskIds.size;
+  const totalReward = useMemo(
+    () => airdropTasks.reduce((sum, task) => completedTaskIds.has(task.id) ? sum + parseInt(task.reward.replace(/[^0-9]/g, ''), 10) : sum, 0),
+    [completedTaskIds],
+  );
 
   return (
     <section id="tasks" className="relative py-20 sm:py-28">
@@ -218,7 +243,7 @@ export function Tasks() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {filtered.map((task, i) => (
               <div key={task.id} className="animate-fade-in-up" style={{ animationDelay: `${i * 0.04}s`, animationFillMode: 'both' }}>
-                <TaskCard task={task} onComplete={handleComplete} />
+                <TaskCard task={task} completed={completedTaskIds.has(task.id)} onComplete={handleComplete} />
               </div>
             ))}
           </div>

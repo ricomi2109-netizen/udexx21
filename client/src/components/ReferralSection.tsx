@@ -7,13 +7,41 @@ export function ReferralSection() {
   const [copied, setCopied] = useState(false);
 
   const referralLink = address
-    ? `https://aurora-airdrop.io/r/${address.slice(2, 10)}`
-    : 'https://aurora-airdrop.io/r/your-wallet';
+    ? `${window.location.origin}/r/${address.slice(2, 10)}`
+    : `${window.location.origin}/r/your-wallet`;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(referralLink);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(referralLink);
+    } catch {
+      const input = document.createElement('textarea');
+      input.value = referralLink;
+      input.setAttribute('readonly', '');
+      input.style.position = 'fixed';
+      input.style.opacity = '0';
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      input.remove();
+    }
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    window.setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShare = async (label: string) => {
+    const shareText = 'Join me on AURORA and earn AUR rewards across chains.';
+    if (label === 'Share' && navigator.share) {
+      try {
+        await navigator.share({ title: 'AURORA Airdrop', text: shareText, url: referralLink });
+      } catch {
+        // Closing the native share sheet is an expected, non-error outcome.
+      }
+      return;
+    }
+    const shareUrl = label === 'X'
+      ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(referralLink)}`
+      : `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(shareText)}`;
+    window.open(shareUrl, '_blank', 'noopener,noreferrer');
   };
 
   const stats = [
@@ -86,6 +114,7 @@ export function ReferralSection() {
                 return (
                   <button
                     key={s.label}
+                    onClick={() => void handleShare(s.label)}
                     className={`w-9 h-9 rounded-lg bg-white/5 ${s.color} flex items-center justify-center text-neutral-400 hover:text-white transition-all`}
                     aria-label={s.label}
                   >
