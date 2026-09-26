@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Twitter, MessageCircle, MessageSquare, Heart, GraduationCap, ArrowLeftRight,
   Droplets, Lock, UserPlus, BadgeCheck, Star, Network, Trophy, Image,
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { airdropTasks, type AirdropTask } from '@/data/tasks';
 import { useWallet } from '@/context/WalletContext';
+import { toast } from 'sonner';
 
 const iconMap: Record<string, LucideIcon> = {
   Twitter, MessageCircle, MessageSquare, Heart, GraduationCap, ArrowLeftRight,
@@ -47,18 +48,29 @@ const taskFilters: FilterType[] = ['All', 'social', 'onchain', 'community', 'qui
 
 function TaskCard({ task, completed, onComplete }: { task: AirdropTask; completed: boolean; onComplete: (id: string) => void }) {
   const [status, setStatus] = useState<'idle' | 'pending' | 'done'>(completed ? 'done' : 'idle');
+  const verificationTimer = useRef<number | null>(null);
   const Icon = iconMap[task.icon] || Gift;
 
   useEffect(() => {
     setStatus(completed ? 'done' : 'idle');
   }, [completed]);
 
+  useEffect(() => {
+    return () => {
+      if (verificationTimer.current !== null) window.clearTimeout(verificationTimer.current);
+    };
+  }, []);
+
   const handleClick = () => {
     if (status !== 'idle' || completed) return;
     setStatus('pending');
-    setTimeout(() => {
+    verificationTimer.current = window.setTimeout(() => {
       setStatus('done');
       onComplete(task.id);
+      toast.success(`${task.reward} added to your local progress`, {
+        description: 'On-chain verification will be connected in a future release.',
+      });
+      verificationTimer.current = null;
     }, 2000);
   };
 
@@ -98,6 +110,8 @@ function TaskCard({ task, completed, onComplete }: { task: AirdropTask; complete
         <button
           onClick={handleClick}
           disabled={status !== 'idle'}
+          aria-label={`${status === 'done' ? 'Completed' : status === 'pending' ? 'Verifying' : 'Start'} task: ${task.title}`}
+          aria-live="polite"
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
             status === 'done'
               ? 'bg-success-500/20 text-success-400 cursor-default'
@@ -168,6 +182,13 @@ export function Tasks() {
     [completedTaskIds],
   );
 
+  const resetProgress = () => {
+    if (!storageKey || completedCount === 0) return;
+    setCompletedTaskIds(new Set());
+    window.localStorage.removeItem(storageKey);
+    toast.success('Task progress reset');
+  };
+
   return (
     <section id="tasks" className="relative py-20 sm:py-28">
       {/* Subtle background */}
@@ -194,9 +215,20 @@ export function Tasks() {
           <div className="glass-card rounded-2xl p-5 mb-8 max-w-2xl mx-auto">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-neutral-300">Your Progress</span>
-              <span className="text-sm font-semibold text-white">
-                {completedCount}/{airdropTasks.length} tasks · {totalReward.toLocaleString()} AUR
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-white">
+                  {completedCount}/{airdropTasks.length} tasks · {totalReward.toLocaleString()} AUR
+                </span>
+                {completedCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={resetProgress}
+                    className="text-xs text-neutral-500 underline decoration-neutral-700 underline-offset-2 transition-colors hover:text-white hover:decoration-neutral-400"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
             </div>
             <div className="h-2 rounded-full bg-neutral-800 overflow-hidden">
               <div
