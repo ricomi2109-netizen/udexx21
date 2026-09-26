@@ -12,6 +12,7 @@ import { Footer } from '@/components/Footer';
 import { Leaderboard } from '@/components/Leaderboard';
 import { ReferralSection } from '@/components/ReferralSection';
 import { WalletConnectFallback } from '@/components/WalletConnectFallback';
+import { WalletConnectionStatus } from '@/components/WalletConnectionStatus';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
       <div className="min-h-screen bg-neutral-950 text-white overflow-x-hidden">
         <Toaster position="bottom-right" richColors theme="dark" />
         <WalletConnectFallback />
+        <WalletConnectionStatus />
         <Header />
         <main>
           <Hero />
