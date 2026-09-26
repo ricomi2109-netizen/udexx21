@@ -47,14 +47,16 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
     setAttempting(true);
 
     try {
-      // On desktop, ask an installed browser extension directly first. This avoids
-      // forcing MetaMask/Coinbase/Brave users through the QR/deep-link chooser.
-      const injectedWallet = connectors.find((connector) => {
+      // Detect installed browser extensions. If there is exactly one, it can be
+      // opened directly; when there are several, show the chooser so the user can
+      // explicitly grant access to the wallet they intend to use.
+      const injectedWallets = connectors.filter((connector) => {
         const hasInjectedProvider = Boolean((window as Window & { ethereum?: unknown }).ethereum);
         return hasInjectedProvider && connector.type === 'injected';
       });
 
-      if (injectedWallet) {
+      if (injectedWallets.length === 1) {
+        const injectedWallet = injectedWallets[0];
         try {
           await connectAsync({ connector: injectedWallet });
           toast.success(`Connected to ${injectedWallet.name}`);
@@ -65,6 +67,8 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
             toast.error('The installed wallet did not respond. Opening the wallet chooser instead.');
           }
         }
+      } else if (injectedWallets.length > 1) {
+        toast.info('Choose which installed wallet should receive access.');
       }
 
       // AppKit handles mobile wallet redirects, WalletConnect QR scanning, and
