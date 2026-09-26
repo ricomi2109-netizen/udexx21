@@ -1,9 +1,10 @@
-import { Zap, Wallet, LogOut, Menu, X } from 'lucide-react';
+import { Zap, LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import { AppKitButton } from '@reown/appkit/react';
 import { useWallet } from '@/context/WalletContext';
 
 export function Header() {
-  const { connected, address, provider, openModal, disconnect } = useWallet();
+  const { connected, address, provider, disconnect } = useWallet();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
@@ -55,13 +56,7 @@ export function Header() {
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={openModal}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-400 hover:to-primary-500 text-white text-sm font-semibold shadow-lg shadow-primary-500/20 transition-all hover:scale-105"
-                >
-                  <Wallet className="w-4 h-4" />
-                  Connect Wallet
-                </button>
+                <AppKitButton namespace="eip155" label="Connect Wallet" />
               )}
 
               {/* Mobile menu */}
