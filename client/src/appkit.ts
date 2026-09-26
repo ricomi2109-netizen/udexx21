@@ -18,9 +18,11 @@ export const appKitConfig = {
   networks,
   projectId,
   metadata: {
-    name: 'My Airdrop Token dApp',
-    description: 'Claim your airdrop tokens here',
+    name: 'AURORA',
+    description: 'Web3 Application',
     url: window.location.origin,
+    // Use the project-owned mark, not a placeholder host. AppKit resolves this
+    // to https://<live-domain>/aurora-mark.svg at runtime.
     icons: [`${window.location.origin}/aurora-mark.svg`],
   },
   features: {
