@@ -21,17 +21,25 @@ interface SupportedNetwork {
   nativeCurrency: string;
 }
 
+interface SwitchSuccess {
+  networkName: string;
+  address: string | null;
+}
+
 interface WalletState {
   connected: boolean;
   connecting: boolean;
   address: string | null;
+  walletName: string | null;
   provider: WalletProvider | null;
   connectionPhase: ConnectionPhase;
   connectionError: string | null;
   chainId: number | undefined;
+  currentNetworkName: string | null;
   wrongNetwork: boolean;
   switchingNetwork: boolean;
   supportedNetworks: SupportedNetwork[];
+  switchSuccess: SwitchSuccess | null;
 }
 
 interface WalletContextValue extends WalletState {
@@ -41,6 +49,7 @@ interface WalletContextValue extends WalletState {
   retry: () => void;
   disconnect: () => void;
   switchNetwork: (chainId: number) => Promise<void>;
+  clearSwitchSuccess: () => void;
   modalOpen: boolean;
 }
 
@@ -64,27 +73,36 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
   const chainId = useChainId();
   const [connectionPhase, setConnectionPhase] = useState<ConnectionPhase>('idle');
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [switchSuccess, setSwitchSuccess] = useState<SwitchSuccess | null>(null);
 
+  const walletName = walletInfo?.name || null;
   const wrongNetwork = Boolean(isConnected && chainId !== undefined && !supportedNetworkIds.has(chainId));
+  const currentNetworkName = supportedNetworks.find((network) => network.id === chainId)?.name ?? null;
 
   const provider = useMemo<WalletProvider | null>(() => {
     if (!isConnected) return null;
     return {
-      id: walletInfo?.name?.toLowerCase().replace(/\s+/g, '-') || 'walletconnect',
-      name: walletInfo?.name || 'Connected wallet',
+      id: walletName?.toLowerCase().replace(/\s+/g, '-') || 'walletconnect',
+      name: walletName || 'Connected wallet',
       description: 'Connected through Reown AppKit',
       icon: '🔗',
       gradient: 'from-primary-400 to-secondary-500',
       category: 'multichain',
       mobile: true,
     };
-  }, [isConnected, walletInfo?.name]);
+  }, [isConnected, walletName]);
 
   useEffect(() => {
     if (!isConnected) return;
     setConnectionPhase(wrongNetwork ? 'wrong-network' : 'connected');
     setConnectionError(null);
   }, [isConnected, wrongNetwork]);
+
+  useEffect(() => {
+    if (!switchSuccess) return;
+    const timeoutId = window.setTimeout(() => setSwitchSuccess(null), 5_000);
+    return () => window.clearTimeout(timeoutId);
+  }, [switchSuccess]);
 
   useEffect(() => {
     if (connectionPhase !== 'connecting') return;
@@ -101,6 +119,7 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
 
   const connect = useCallback(async () => {
     setConnectionError(null);
+    setSwitchSuccess(null);
     setConnectionPhase('connecting');
 
     try {
@@ -131,22 +150,27 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
     void disconnectAsync();
     setConnectionPhase('idle');
     setConnectionError(null);
+    setSwitchSuccess(null);
   }, [disconnectAsync]);
 
   const switchNetwork = useCallback(
     async (targetChainId: number) => {
       setConnectionError(null);
+      setSwitchSuccess(null);
       try {
         await switchChainAsync({ chainId: targetChainId });
         const target = supportedNetworks.find((network) => network.id === targetChainId);
-        toast.success(`Switched to ${target?.name ?? 'supported network'}`);
+        const networkName = target?.name ?? 'supported network';
+        setConnectionPhase('connected');
+        setSwitchSuccess({ networkName, address: address ?? null });
+        toast.success(`Switched to ${networkName}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Network switch was rejected';
         setConnectionError(message);
         toast.error(`Could not switch network: ${message}`);
       }
     },
-    [switchChainAsync],
+    [address, switchChainAsync],
   );
 
   const connecting = connectionPhase === 'connecting' || status === 'connecting';
@@ -157,19 +181,23 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
         connected: isConnected,
         connecting,
         address: address ?? null,
+        walletName,
         provider,
         connectionPhase,
         connectionError,
         chainId,
+        currentNetworkName,
         wrongNetwork,
         switchingNetwork,
         supportedNetworks,
+        switchSuccess,
         openModal: () => void connect(),
         closeModal,
         connect: () => void connect(),
         retry,
         disconnect,
         switchNetwork,
+        clearSwitchSuccess: () => setSwitchSuccess(null),
         modalOpen,
       }}
     >

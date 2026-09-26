@@ -11,7 +11,7 @@ const queryClient = new QueryClient();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <WagmiProvider config={wagmiAdapter.wagmiConfig}>
+    <WagmiProvider config={wagmiAdapter.wagmiConfig} reconnectOnMount>
       <QueryClientProvider client={queryClient}>
         <AppKitProvider {...appKitConfig}>
           <App />

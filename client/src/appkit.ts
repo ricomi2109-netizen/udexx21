@@ -1,5 +1,6 @@
 import { arbitrum, base, mainnet, optimism, polygon, type AppKitNetwork } from '@reown/appkit/networks';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
+import { createStorage } from 'wagmi';
 
 // Reown project IDs are public frontend identifiers. Keep a publish-safe fallback so
 // the app does not crash if a deployment omits Vite environment injection.
@@ -10,6 +11,7 @@ export const networks = [mainnet, arbitrum, base, polygon, optimism] as [AppKitN
 export const wagmiAdapter = new WagmiAdapter({
   networks,
   projectId,
+  storage: createStorage({ storage: window.localStorage }),
   ssr: false,
 });
 
