@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useAppKit, useAppKitAccount, useAppKitState, useWalletInfo } from '@reown/appkit/react';
-import { useChainId, useDisconnect, useSwitchChain } from 'wagmi';
+import { useChainId, useDisconnect, useEnsAvatar, useEnsName, useSwitchChain } from 'wagmi';
 import { toast } from 'sonner';
 import { networks } from '@/appkit';
 import type { WalletProvider } from '@/data/wallets';
@@ -24,6 +24,8 @@ interface SupportedNetwork {
 interface SwitchSuccess {
   networkName: string;
   address: string | null;
+  ensName: string | null;
+  avatarUrl: string | null;
 }
 
 interface WalletState {
@@ -31,6 +33,8 @@ interface WalletState {
   connecting: boolean;
   address: string | null;
   walletName: string | null;
+  ensName: string | null;
+  avatarUrl: string | null;
   provider: WalletProvider | null;
   connectionPhase: ConnectionPhase;
   connectionError: string | null;
@@ -40,6 +44,7 @@ interface WalletState {
   switchingNetwork: boolean;
   supportedNetworks: SupportedNetwork[];
   switchSuccess: SwitchSuccess | null;
+  resumeAvailable: boolean;
 }
 
 interface WalletContextValue extends WalletState {
@@ -50,6 +55,8 @@ interface WalletContextValue extends WalletState {
   disconnect: () => void;
   switchNetwork: (chainId: number) => Promise<void>;
   clearSwitchSuccess: () => void;
+  resumeConnection: () => void;
+  dismissResume: () => void;
   modalOpen: boolean;
 }
 
@@ -71,11 +78,25 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
   const { disconnectAsync } = useDisconnect();
   const { switchChainAsync, isPending: switchingNetwork } = useSwitchChain();
   const chainId = useChainId();
+  const ensQuery = useEnsName({
+    address: address as `0x${string}` | undefined,
+    chainId: 1,
+    query: { enabled: Boolean(isConnected && address) },
+  });
+  const ensAvatarQuery = useEnsAvatar({
+    name: ensQuery.data ?? undefined,
+    chainId: 1,
+    query: { enabled: Boolean(ensQuery.data) },
+  });
   const [connectionPhase, setConnectionPhase] = useState<ConnectionPhase>('idle');
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [switchSuccess, setSwitchSuccess] = useState<SwitchSuccess | null>(null);
+  const [resumeAvailable, setResumeAvailable] = useState(false);
+  const [wasHiddenDuringConnection, setWasHiddenDuringConnection] = useState(false);
 
   const walletName = walletInfo?.name || null;
+  const ensName = ensQuery.data ?? null;
+  const avatarUrl = ensAvatarQuery.data ?? (address ? `https://api.dicebear.com/9.x/identicon/svg?seed=${encodeURIComponent(address)}` : null);
   const wrongNetwork = Boolean(isConnected && chainId !== undefined && !supportedNetworkIds.has(chainId));
   const currentNetworkName = supportedNetworks.find((network) => network.id === chainId)?.name ?? null;
 
@@ -97,6 +118,32 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
     setConnectionPhase(wrongNetwork ? 'wrong-network' : 'connected');
     setConnectionError(null);
   }, [isConnected, wrongNetwork]);
+
+  useEffect(() => {
+    const markReturn = () => {
+      if (document.visibilityState === 'hidden') {
+        if (connectionPhase === 'connecting' || status === 'connecting') setWasHiddenDuringConnection(true);
+        return;
+      }
+      if (wasHiddenDuringConnection && !isConnected && (connectionPhase === 'connecting' || connectionPhase === 'idle')) {
+        setResumeAvailable(true);
+      }
+    };
+    document.addEventListener('visibilitychange', markReturn);
+    window.addEventListener('focus', markReturn);
+    window.addEventListener('pageshow', markReturn);
+    return () => {
+      document.removeEventListener('visibilitychange', markReturn);
+      window.removeEventListener('focus', markReturn);
+      window.removeEventListener('pageshow', markReturn);
+    };
+  }, [connectionPhase, isConnected, status, wasHiddenDuringConnection]);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    setResumeAvailable(false);
+    setWasHiddenDuringConnection(false);
+  }, [isConnected]);
 
   useEffect(() => {
     if (!switchSuccess) return;
@@ -121,6 +168,7 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
     setConnectionError(null);
     setSwitchSuccess(null);
     setConnectionPhase('connecting');
+    setResumeAvailable(false);
 
     try {
       // One canonical path keeps installed extensions, wallet-specific mobile
@@ -137,6 +185,16 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
   const retry = useCallback(() => {
     void connect();
   }, [connect]);
+
+  const resumeConnection = useCallback(() => {
+    setResumeAvailable(false);
+    void connect();
+  }, [connect]);
+
+  const dismissResume = useCallback(() => {
+    setResumeAvailable(false);
+    setWasHiddenDuringConnection(false);
+  }, []);
 
   const closeModal = useCallback(() => {
     close();
@@ -162,7 +220,7 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
         const target = supportedNetworks.find((network) => network.id === targetChainId);
         const networkName = target?.name ?? 'supported network';
         setConnectionPhase('connected');
-        setSwitchSuccess({ networkName, address: address ?? null });
+        setSwitchSuccess({ networkName, address: address ?? null, ensName, avatarUrl });
         toast.success(`Switched to ${networkName}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Network switch was rejected';
@@ -170,7 +228,7 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
         toast.error(`Could not switch network: ${message}`);
       }
     },
-    [address, switchChainAsync],
+    [address, avatarUrl, ensName, switchChainAsync],
   );
 
   const connecting = connectionPhase === 'connecting' || status === 'connecting';
@@ -182,6 +240,8 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
         connecting,
         address: address ?? null,
         walletName,
+        ensName,
+        avatarUrl,
         provider,
         connectionPhase,
         connectionError,
@@ -191,6 +251,7 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
         switchingNetwork,
         supportedNetworks,
         switchSuccess,
+        resumeAvailable,
         openModal: () => void connect(),
         closeModal,
         connect: () => void connect(),
@@ -198,6 +259,8 @@ export function WalletProviderContext({ children }: { children: ReactNode }) {
         disconnect,
         switchNetwork,
         clearSwitchSuccess: () => setSwitchSuccess(null),
+        resumeConnection,
+        dismissResume,
         modalOpen,
       }}
     >

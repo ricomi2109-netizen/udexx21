@@ -37,6 +37,10 @@ function shortenAddress(address: string | null) {
   return address ? `${address.slice(0, 6)}…${address.slice(-4)}` : 'Wallet address unavailable';
 }
 
+function WalletAvatar({ src, address, size = 'h-10 w-10' }: { src: string | null; address: string | null; size?: string }) {
+  return src ? <img src={src} alt="Personalized wallet avatar" className={`${size} rounded-2xl border border-white/10 bg-white/10 object-cover`} /> : <div className={`${size} rounded-2xl bg-gradient-to-br from-primary-300 to-secondary-500`} aria-hidden="true" />;
+}
+
 export function WalletConnectionStatus() {
   const {
     connecting,
@@ -54,6 +58,11 @@ export function WalletConnectionStatus() {
     address,
     switchSuccess,
     clearSwitchSuccess,
+    resumeAvailable,
+    resumeConnection,
+    dismissResume,
+    ensName,
+    avatarUrl,
   } = useWallet();
   const [selectedGuideId, setSelectedGuideId] = useState('MetaMask');
 
@@ -72,17 +81,29 @@ export function WalletConnectionStatus() {
   const showNetworkPrompt = wrongNetwork;
   const showSwitchSuccess = Boolean(switchSuccess);
 
+  if (resumeAvailable) {
+    return (
+      <div className="fixed bottom-5 left-1/2 z-[2147483646] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-3xl border border-primary-300/30 bg-[#10191b]/95 p-4 text-white shadow-2xl shadow-black/50 backdrop-blur-xl">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary-300/15 text-primary-200"><RefreshCw className="h-5 w-5" /></div>
+          <div className="min-w-0 flex-1"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-200">Back from wallet</p><h2 className="mt-1 text-base font-semibold">Resume connection?</h2><p className="mt-1 text-xs leading-5 text-neutral-400">Your wallet app is back in focus. Continue the connection request or choose another wallet.</p></div>
+          <button type="button" aria-label="Dismiss resume connection" onClick={dismissResume} className="rounded-xl p-2 text-neutral-400 transition hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="mt-3 flex gap-2"><button type="button" onClick={resumeConnection} className="flex-1 rounded-2xl bg-primary-300 px-3 py-2.5 text-sm font-semibold text-neutral-950 transition hover:bg-primary-200">Resume connection</button><button type="button" onClick={dismissResume} className="rounded-2xl border border-white/10 px-3 py-2.5 text-sm font-semibold text-neutral-200 transition hover:bg-white/10">Not now</button></div>
+      </div>
+    );
+  }
+
   if (showSwitchSuccess && switchSuccess) {
     return (
       <div className="fixed bottom-5 left-1/2 z-[2147483646] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-3xl border border-primary-300/30 bg-[#10191b]/95 p-4 text-white shadow-2xl shadow-black/50 backdrop-blur-xl">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary-300/15 text-primary-200">
-            <CheckCircle2 className="h-5 w-5" />
-          </div>
+          <WalletAvatar src={switchSuccess.avatarUrl || avatarUrl} address={switchSuccess.address} />
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-200">Network ready</p>
             <h2 className="mt-1 text-base font-semibold">Connected to {switchSuccess.networkName}</h2>
-            <p className="mt-1 truncate font-mono text-xs text-neutral-400">{shortenAddress(switchSuccess.address)}</p>
+            <p className="mt-1 truncate text-sm font-medium text-white">{switchSuccess.ensName || ensName || 'Wallet connected'}</p>
+            <p className="truncate font-mono text-xs text-neutral-400">{shortenAddress(switchSuccess.address)}</p>
           </div>
           <button type="button" aria-label="Dismiss network success" onClick={clearSwitchSuccess} className="rounded-xl p-2 text-neutral-400 transition hover:bg-white/10 hover:text-white">
             <X className="h-4 w-4" />
